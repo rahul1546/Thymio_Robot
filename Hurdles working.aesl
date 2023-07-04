@@ -1,0 +1,194 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+
+
+<!--list of constants-->
+<constant value="0" name="STOPPED"/>
+<constant value="1" name="LEFT"/>
+<constant value="2" name="RIGHT"/>
+<constant value="300" name="EDGE"/>
+<constant value="500" name="TARGET"/>
+<constant value="3" name="FORWARD"/>
+<constant value="4" name="LOST"/>
+<constant value="100" name="TARGET_TWO"/>
+<constant value="272" name="SLOW_SPEED"/>
+<constant value="1000" name="THRESHOLD"/>
+<constant value="3000" name="TH1"/>
+<constant value="5" name="AVOID"/>
+<constant value="500" name="TARGET_3"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">#*  File: ReadFollow
+	Date: Jan, 2022
+	Author: CSCI 1108: Experimental Robotics.
+	Purpose: Lab 7, Dealing with Failure
+	Description: A program that makes the Thymio Robot follow a black
+	             taped line.
+*#
+
+var state                        # variable declarations
+var todo
+timer.period[0] = 0
+callsub stop 
+onevent button.forward                       # on forward button press
+  state = FORWARD                             # transition to FORWARD state
+  
+
+onevent button.backward                      # on backward button press
+  callsub stop
+	
+onevent prox                                 # on prox event
+if (state != STOPPED) then                   # if robot is moving
+  		if (state==AVOID and(prox.horizontal[0]==0 and prox.horizontal[1]==0 and prox.horizontal[2]==0 and prox.horizontal[3]==0 and prox.horizontal[4]==0)) then
+			if (todo==LEFT) then
+					motor.left.target = TARGET_3
+	    			motor.right.target = SLOW_SPEED
+			end
+			if (todo==RIGHT) then
+					motor.left.target = SLOW_SPEED
+	    			motor.right.target = TARGET_3
+			end
+			if (prox.ground.delta[0] &lt; EDGE or prox.ground.delta[1] &lt; EDGE) then
+		   		timer.period[1]=500
+		   		if (todo==RIGHT) then
+		   		call leds.circle(0,32,0,32,0,32,0,32)
+		   			motor.left.target = SLOW_SPEED
+	    			   motor.right.target = 0
+		   		end
+		   		if (todo==LEFT) then
+		   		call leds.circle(0,32,0,32,0,32,0,32)
+		   			motor.left.target = 0
+	    			   motor.right.target = SLOW_SPEED
+		   		end
+			end
+	   end
+    	if((prox.horizontal[0]>=THRESHOLD or prox.horizontal[1]>=THRESHOLD or prox.horizontal[2]>=THRESHOLD or prox.horizontal[3]>=THRESHOLD or prox.horizontal[4]>=THRESHOLD) and state!=AVOID) then
+    		if (state!=AVOID) then
+   	    	callsub stop
+   	    	timer.period[1]=1000	
+    		end
+		else
+		   if (prox.ground.delta[0] >= EDGE and state!=AVOID) then
+		       callsub right
+		   end
+			    
+			    # if moving right and sensing black line
+			if (prox.ground.delta[1] >= EDGE and state!=AVOID) then
+				 callsub left
+			end   
+					# Both the sensors sense the tape
+		   if (prox.ground.delta[0] &lt; EDGE and prox.ground.delta[1] &lt; EDGE and state!=AVOID) then
+
+				 callsub fwd
+			end   
+			    
+			if (prox.ground.delta[0] >= EDGE and prox.ground.delta[1] >= EDGE and state!=AVOID) then
+			    	 	
+			    	 	timer.period[0]=960
+		   end
+		end
+
+
+end
+onevent timer0
+	timer.period[0]=0
+	   if (prox.ground.delta[0] >= EDGE and prox.ground.delta[1] >= EDGE) then
+
+    	  if (state==RIGHT) then
+    	     state=LOST    	  
+	    	  motor.left.target = 0
+	    	  motor.right.target = SLOW_SPEED
+	    	  call leds.circle(32,32,32,32,32,32,32,32)   
+    	  end
+    	  if (state==LEFT) then
+    	     state=LOST
+	    	  motor.left.target = SLOW_SPEED 
+	    	  motor.right.target = 0
+    	  	  call leds.circle(32,32,32,32,32,32,32,32)   
+    	  end
+    	  if (state==FORWARD) then
+        	  state=LOST
+	    	  motor.left.target = - SLOW_SPEED
+	    	  motor.right.target = - SLOW_SPEED 
+	    	  call leds.circle(32,32,32,32,32,32,32,32)       	  	
+    	  	
+    	  end
+    	end
+
+onevent timer1
+	timer.period[1]=0
+	if (state==STOPPED) then
+		state=AVOID
+	   callsub avoid	
+	else
+		state=FORWARD
+		callsub fwd
+	end
+
+
+sub avoid 
+     	if (prox.horizontal[0] > prox.horizontal[1]) then
+	      call leds.circle(32,32,32,32,0,0,0,0)
+      	todo=RIGHT
+	   elseif ((prox.horizontal[2] + prox.horizontal[3]+ prox.horizontal[4])/3 > (prox.horizontal[0]+ prox.horizontal[1] + prox.horizontal[2])/3) then
+      	call leds.circle(32,32,32,32,0,0,0,0)
+      	todo=RIGHT
+      elseif ((prox.horizontal[0]+ prox.horizontal[1] + prox.horizontal[2])/3 > (prox.horizontal[2]+ prox.horizontal[3] + prox.horizontal[4])/3) then
+	      call leds.circle(0,0,0,0,32,32,32,32)
+	      todo=LEFT
+      end
+      
+      
+	   if (todo==LEFT) then
+	      motor.left.target = -TARGET
+		   motor.right.target = TARGET
+		   if ((prox.horizontal[0]==0 and prox.horizontal[1]==0 and prox.horizontal[2]==0 and prox.horizontal[3]==0 and prox.horizontal[4]==0)) then
+	    		motor.left.target = TARGET
+	    		motor.right.target = SLOW_SPEED
+	   	end
+      end
+	   if (todo==RIGHT) then
+      	motor.left.target = TARGET
+		   motor.right.target = -TARGET
+			if ((prox.horizontal[0]==0 and prox.horizontal[1]==0 and prox.horizontal[2]==0 and prox.horizontal[3]==0 and prox.horizontal[4]==0)) then
+		    	motor.left.target = SLOW_SPEED
+		    	motor.right.target = TARGET
+		   end
+      end	
+
+	
+sub left
+		state = LEFT                          #  transition to LEFT state
+      motor.left.target = TARGET_TWO        #  move left
+      motor.right.target = TARGET
+      call leds.circle(0,0,0,0,0,0,0,0)
+
+sub right
+	   state=RIGHT										 #  transition to RIGHT state
+      motor.left.target = TARGET             #  move right
+      motor.right.target = TARGET_TWO
+      call leds.circle(0,0,0,0,0,0,0,0)
+      
+sub stop
+	   state=STOPPED										 #  transition to STOPPED state
+      motor.left.target = 0                      #  stop moving
+      motor.right.target = 0 
+      call leds.circle(0,0,0,0,0,0,0,0)
+      
+sub fwd
+		state=FORWARD										 #  transition to STOPPED state
+      motor.left.target = TARGET                      #  stop moving
+      motor.right.target = TARGET
+      call leds.circle(0,0,0,0,0,0,0,0) 
+</node>
+
+
+</network>
